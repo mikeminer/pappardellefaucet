@@ -10,16 +10,20 @@ import {
 const frameImageUrl = `${siteOrigin}/images/pappardelle-faucet-banner.png`;
 const miniAppName = "PAPPARDELLE Faucet";
 
-const accountAssociation =
-  process.env.FARCASTER_ACCOUNT_ASSOCIATION_HEADER &&
-  process.env.FARCASTER_ACCOUNT_ASSOCIATION_PAYLOAD &&
-  process.env.FARCASTER_ACCOUNT_ASSOCIATION_SIGNATURE
-    ? {
-        header: process.env.FARCASTER_ACCOUNT_ASSOCIATION_HEADER,
-        payload: process.env.FARCASTER_ACCOUNT_ASSOCIATION_PAYLOAD,
-        signature: process.env.FARCASTER_ACCOUNT_ASSOCIATION_SIGNATURE
-      }
-    : undefined;
+const defaultAccountAssociation = {
+  header:
+    "eyJmaWQiOjQ2ODk3OSwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweGFjMDIwNzhFZWQxMjBGMjMyMUE4ODgzRjE1Q0FjRUI3N2JhQzVjRTAifQ",
+  payload: "eyJkb21haW4iOiJwYXBwYXJkZWxsZWZhdWNldC52ZXJjZWwuYXBwIn0",
+  signature:
+    "IYjwMdgxc+SlELyg/4G3zdH7MC8xEsZSses3uDZgTugJpJ28NG2XUXdsmJ3veJDvzOYdJ/uGV+4lwbuYYA89LBs="
+};
+
+const accountAssociation = {
+  header: process.env.FARCASTER_ACCOUNT_ASSOCIATION_HEADER || defaultAccountAssociation.header,
+  payload: process.env.FARCASTER_ACCOUNT_ASSOCIATION_PAYLOAD || defaultAccountAssociation.payload,
+  signature:
+    process.env.FARCASTER_ACCOUNT_ASSOCIATION_SIGNATURE || defaultAccountAssociation.signature
+};
 
 export const farcasterFrame = {
   version: "1",
