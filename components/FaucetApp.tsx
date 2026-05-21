@@ -529,7 +529,10 @@ export function FaucetApp() {
         });
 
         if (!authorizationResponse.ok) {
-          throw new Error("The referral registrar could not verify this Base claim yet.");
+          const registrarError = (await authorizationResponse.json().catch(() => undefined)) as
+            | { error?: string }
+            | undefined;
+          throw new Error(registrarError?.error || "The referral registrar could not verify this Base claim yet.");
         }
 
         const authorization = (await authorizationResponse.json()) as ReferralAuthorizationResponse;

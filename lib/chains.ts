@@ -12,7 +12,8 @@ export const referralRegistryAddress = process.env.NEXT_PUBLIC_REFERRAL_REGISTRY
   | `0x${string}`
   | undefined;
 
-export const referralAuthApiUrl = process.env.NEXT_PUBLIC_REFERRAL_AUTH_API_URL;
+export const referralAuthApiUrl =
+  process.env.NEXT_PUBLIC_REFERRAL_AUTH_API_URL || "/api/referral/authorize";
 
 export const baseRpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL || "https://mainnet.base.org";
 export const baseRpcUrls = Array.from(

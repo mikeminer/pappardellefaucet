@@ -92,8 +92,16 @@ Dopo il deploy:
 
 1. Imposta `NEXT_PUBLIC_REFERRAL_REGISTRY_ADDRESS` su Vercel.
 2. Imposta `NEXT_PUBLIC_REFERRAL_RPC_URL=https://forno.celo.org` oppure un RPC Celo dedicato.
-3. Collega un registrar/API che controlla il claim su Base e chiama `recordReferral(account, referrer, baseClaimTxHash)` su Celo, oppure restituisce una firma EIP-712 per `register(...)`.
+3. Configura `REFERRAL_CLAIM_SIGNER_PRIVATE_KEY` su Vercel. Deve essere la private key del wallet `claimSigner` del registry Celo.
 4. Ridistribuisci la web app.
+
+Il progetto include gia il registrar API in:
+
+```text
+/api/referral/authorize
+```
+
+Questo endpoint controlla il receipt della transazione su Base, verifica l'evento `Claimed(account, amount)` dal vault faucet e restituisce una firma EIP-712 per `register(referrer, baseClaimTxHash, deadline, signature)` sul registry Celo.
 
 ## Variabili Vercel
 
@@ -103,11 +111,15 @@ NEXT_PUBLIC_TOKEN_ADDRESS=0x41859a1048fb4f8d668861b1249504bf52e6d3bd
 NEXT_PUBLIC_FAUCET_ADDRESS=0xCE749CDe53b8E6791F300555d9ee8b1Df9B21f65
 NEXT_PUBLIC_REFERRAL_REGISTRY_ADDRESS=0xAD85C867587F642Ba2303731F32fEA252838A025
 NEXT_PUBLIC_REFERRAL_RPC_URL=https://forno.celo.org
-NEXT_PUBLIC_REFERRAL_AUTH_API_URL=https://...
+NEXT_PUBLIC_REFERRAL_AUTH_API_URL=/api/referral/authorize
+REFERRAL_CLAIM_SIGNER_PRIVATE_KEY=0x...
+REFERRAL_SIGNATURE_TTL_SECONDS=900
 FARCASTER_ACCOUNT_ASSOCIATION_HEADER=...
 FARCASTER_ACCOUNT_ASSOCIATION_PAYLOAD=...
 FARCASTER_ACCOUNT_ASSOCIATION_SIGNATURE=...
 ```
+
+`REFERRAL_CLAIM_SIGNER_PRIVATE_KEY` non deve mai essere `NEXT_PUBLIC`. Non serve tenerci CELO se usi la modalita firma: il signer autorizza, mentre l'utente invia la transazione `register(...)` su Celo.
 
 ## MiniPay e Farcaster
 
