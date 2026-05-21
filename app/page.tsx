@@ -56,6 +56,7 @@ const jsonLd = {
         "Base network wallet connection",
         "Vault donation flow for faucet refills",
         "Celo referral leaderboard",
+        "Monthly pass purchase with PAPPARDELLE",
         "MiniPay and Farcaster Mini App compatibility",
         "Links to PAPPARDELLE on Zora and Rektaurant"
       ],

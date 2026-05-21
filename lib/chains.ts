@@ -15,6 +15,12 @@ export const referralRegistryAddress = process.env.NEXT_PUBLIC_REFERRAL_REGISTRY
 export const referralAuthApiUrl =
   process.env.NEXT_PUBLIC_REFERRAL_AUTH_API_URL || "/api/referral/authorize";
 
+export const monthlyPassRecipient = process.env.NEXT_PUBLIC_MONTHLY_PASS_RECIPIENT as
+  | `0x${string}`
+  | undefined;
+
+export const monthlyPassPrice = process.env.NEXT_PUBLIC_MONTHLY_PASS_PRICE || "10000000";
+
 export const baseRpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL || "https://mainnet.base.org";
 export const baseRpcUrls = Array.from(
   new Set([baseRpcUrl, "https://base-rpc.publicnode.com", "https://base.llamarpc.com"])

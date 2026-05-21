@@ -250,6 +250,100 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.monthly-special {
+  display: grid;
+  gap: 18px;
+  padding: clamp(20px, 3vw, 30px);
+  border: 1px solid rgba(255, 246, 224, 0.48);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 252, 243, 0.96), rgba(255, 242, 215, 0.94)),
+    url("/images/italian-tablecloth.png") center / cover;
+  box-shadow: 0 22px 46px rgba(54, 12, 8, 0.22);
+}
+
+.monthly-special-copy {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.monthly-special-copy > div:last-child {
+  min-width: 0;
+}
+
+.monthly-special-icon {
+  width: 50px;
+  height: 50px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #f3ead2;
+  color: var(--tomato);
+}
+
+.monthly-special h2 {
+  margin-top: 4px;
+  font-size: clamp(2.2rem, 5vw, 4rem);
+}
+
+.monthly-special p {
+  max-width: 760px;
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-weight: 800;
+  line-height: 1.45;
+}
+
+.monthly-special strong {
+  display: inline-flex;
+  margin-top: 12px;
+  color: var(--tomato);
+  font-size: 1.1rem;
+  font-weight: 950;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.monthly-special-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.special-button {
+  min-height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 900;
+  line-height: 1.15;
+  text-align: center;
+}
+
+.special-button.primary {
+  background: linear-gradient(180deg, #1f6d3a, #164b2b);
+  color: #ffffff;
+  box-shadow: 0 16px 32px rgba(31, 109, 58, 0.2);
+}
+
+.special-button.secondary {
+  border: 1px solid var(--line);
+  background: #fffaf0;
+  color: var(--ink);
+}
+
+.special-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  box-shadow: none;
+}
+
 .claim-panel {
   min-height: 430px;
   display: grid;
@@ -986,6 +1080,10 @@ h2 {
     font-size: 2.6rem;
   }
 
+  .monthly-special-actions {
+    grid-template-columns: 1fr;
+  }
+
   .dish-showcase {
     min-height: 340px;
   }
@@ -1064,6 +1162,14 @@ h2 {
 
   .menu-dish-link strong {
     font-size: 0.92rem;
+  }
+
+  .monthly-special-copy {
+    flex-direction: column;
+  }
+
+  .monthly-special h2 {
+    font-size: 2rem;
   }
 
   .invite-modal {
