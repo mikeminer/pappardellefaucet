@@ -13,9 +13,7 @@ import {
   Loader2,
   Mail,
   PlugZap,
-  ShoppingBag,
   ShieldCheck,
-  Ticket,
   Trophy,
   Utensils,
   UserPlus,
@@ -39,8 +37,6 @@ import {
   appChainParams,
   baseRpcUrls,
   faucetAddress,
-  monthlyPassPrice,
-  monthlyPassRecipient,
   referralAuthApiUrl,
   referralChain,
   referralChainIdHex,
@@ -97,8 +93,6 @@ const configuredReferralRegistryAddress =
   referralRegistryAddress && isAddress(referralRegistryAddress)
     ? (referralRegistryAddress as Address)
     : undefined;
-const configuredMonthlyPassRecipient =
-  monthlyPassRecipient && isAddress(monthlyPassRecipient) ? (monthlyPassRecipient as Address) : undefined;
 const faucetSiteUrl = "https://pappardellefaucet.vercel.app/";
 const rektaurantUrl = "https://rektaurant.vercel.app/";
 const zoraUrl = "https://zora.co/@pappardelle/creator-coin";
@@ -151,7 +145,6 @@ export function FaucetApp() {
   const [showInvitation, setShowInvitation] = useState(false);
   const [donationAmount, setDonationAmount] = useState("");
   const [isDonating, setIsDonating] = useState(false);
-  const [isBuyingMonthlyPass, setIsBuyingMonthlyPass] = useState(false);
   const [pendingReferrer, setPendingReferrer] = useState<Address>();
   const [referralSnapshot, setReferralSnapshot] = useState<ReferralSnapshot>({});
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -674,68 +667,6 @@ export function FaucetApp() {
     switchToBase
   ]);
 
-  const buyMonthlyPass = useCallback(async () => {
-    setError(undefined);
-    setStatus(undefined);
-    setTxHash(undefined);
-
-    if (!configuredMonthlyPassRecipient) {
-      setError("The monthly pass recipient is not configured yet.");
-      return;
-    }
-
-    try {
-      const parsedPassPrice = parseUnits(monthlyPassPrice, snapshot.decimals);
-
-      if (snapshot.walletBalance !== undefined && parsedPassPrice > snapshot.walletBalance) {
-        throw new Error(`You need ${monthlyPassPrice} PAPPARDELLE for the monthly pass.`);
-      }
-
-      const activeAccount = account || (await requestAccount());
-      await switchToBase();
-
-      const provider = getProvider();
-      if (!provider) throw new Error("Wallet not found.");
-
-      setIsBuyingMonthlyPass(true);
-      setStatus("Confirm the monthly pass purchase in your wallet.");
-
-      const walletClient = createWalletClient({
-        account: activeAccount,
-        chain: appChain,
-        transport: custom(provider)
-      });
-
-      const hash = await walletClient.writeContract({
-        address: tokenAddress,
-        abi: erc20Abi,
-        functionName: "transfer",
-        args: [configuredMonthlyPassRecipient, parsedPassPrice]
-      });
-
-      setTxChain("base");
-      setTxHash(hash);
-      setStatus("Monthly pass payment sent. Waiting for Base confirmation.");
-
-      await publicClient.waitForTransactionReceipt({ hash });
-      setStatus("Monthly pass purchased with PAPPARDELLE.");
-      await refresh(activeAccount);
-    } catch (monthlyPassError) {
-      setError(getErrorMessage(monthlyPassError));
-    } finally {
-      setIsBuyingMonthlyPass(false);
-    }
-  }, [
-    account,
-    getProvider,
-    publicClient,
-    refresh,
-    requestAccount,
-    snapshot.decimals,
-    snapshot.walletBalance,
-    switchToBase
-  ]);
-
   const claim = useCallback(async () => {
     setError(undefined);
     setStatus(undefined);
@@ -906,12 +837,6 @@ export function FaucetApp() {
     miniAppCompatibility.isMiniPay ||
     !configuredFaucetAddress ||
     !donationAmount.trim();
-  const monthlyPassDisabled =
-    isConnecting ||
-    isBuyingMonthlyPass ||
-    isRefreshing ||
-    miniAppCompatibility.isMiniPay ||
-    !configuredMonthlyPassRecipient;
 
   const claimLabel = miniAppCompatibility.isMiniPay
     ? "Base wallet required"
@@ -981,42 +906,6 @@ export function FaucetApp() {
             <strong>{faucetSiteUrl}</strong>
           </a>
         </div>
-      </section>
-
-      <section className="monthly-special" aria-label="PAPPARDELLE monthly special">
-        <div className="monthly-special-copy">
-          <div className="monthly-special-icon">
-            <Ticket size={28} />
-          </div>
-          <div>
-            <p className="eyebrow">Monthly special</p>
-            <h2>Monthly pass</h2>
-            <p>Buy PAPPARDELLE on Zora or request them from the faucet, then buy the monthly pass.</p>
-            <strong>Price: {monthlyPassPrice} {displaySymbol}</strong>
-          </div>
-        </div>
-
-        <div className="monthly-special-actions">
-          <a className="special-button secondary" href={zoraUrl} target="_blank" rel="noreferrer">
-            <ExternalLink size={18} />
-            <span>Buy on Zora</span>
-          </a>
-          <button className="special-button secondary" type="button" onClick={claim} disabled={claimDisabled}>
-            {isClaiming ? <Loader2 className="spin" size={18} /> : <PlugZap size={18} />}
-            <span>Request PAPPARDELLE from faucet</span>
-          </button>
-          <button className="special-button primary" type="button" onClick={buyMonthlyPass} disabled={monthlyPassDisabled}>
-            {isBuyingMonthlyPass ? <Loader2 className="spin" size={18} /> : <ShoppingBag size={18} />}
-            <span>Buy monthly pass using PAPPARDELLE</span>
-          </button>
-        </div>
-
-        {!configuredMonthlyPassRecipient ? (
-          <div className="notice warning">
-            <AlertTriangle size={18} />
-            <span>Set NEXT_PUBLIC_MONTHLY_PASS_RECIPIENT to enable monthly pass payments.</span>
-          </div>
-        ) : null}
       </section>
 
       <section className="claim-layout">

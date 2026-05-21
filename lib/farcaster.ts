@@ -12,11 +12,11 @@ const frameImageUrl = `${siteOrigin}/images/pappardelle-faucet-banner.png`;
 const miniAppName = "PAPPARDELLE Faucet";
 const miniAppTagline = "Claim crypto meatballs on Base";
 const miniAppOgDescription =
-  "Claim PAPPARDELLE once per wallet on Base. Earn referral points and buy monthly passes with crypto meatballs from pappardelle.eth.";
+  "Claim PAPPARDELLE once per wallet on Base. Earn referral points, refill the faucet, and explore tools from pappardelle.eth.";
 const miniAppScreenshotUrls = [
   `${siteOrigin}/images/farcaster-screenshot-claim.jpg`,
   `${siteOrigin}/images/farcaster-screenshot-zora.jpg`,
-  `${siteOrigin}/images/farcaster-screenshot-pass.jpg`
+  `${siteOrigin}/images/farcaster-screenshot-donate.jpg`
 ];
 
 const defaultAccountAssociation = {

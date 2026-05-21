@@ -27,7 +27,6 @@ Referral registry Celo deployato:
 - Il limite e salvato on-chain in `hasClaimed(address)`.
 - Il contratto opzionale `PappardelleReferralRegistry` viene deployato su Celo mainnet e assegna punti on-chain per un futuro airdrop.
 - La UI legge `?ref=0x...`, mostra la leaderboard Celo e puo chiedere al registrar di sincronizzare i punti dopo il claim.
-- La sezione "Monthly special" guida gli utenti a comprare PAPPARDELLE su Zora, richiederle dal faucet e comprare il monthly pass con PAPPARDELLE.
 - La UI include un hook di compatibilita per MiniPay e Farcaster Mini Apps: rileva MiniPay, chiama `sdk.actions.ready()` in Farcaster e usa il provider Farcaster quando disponibile.
 - Il progetto espone `/.well-known/farcaster.json`, `/manifest.json`, meta `fc:miniapp` / `fc:frame` e un webhook Farcaster minimale.
 - Vercel ospita solo la UI, quindi non serve mettere una private key nel frontend.
@@ -113,8 +112,6 @@ NEXT_PUBLIC_FAUCET_ADDRESS=0xCE749CDe53b8E6791F300555d9ee8b1Df9B21f65
 NEXT_PUBLIC_REFERRAL_REGISTRY_ADDRESS=0xAD85C867587F642Ba2303731F32fEA252838A025
 NEXT_PUBLIC_REFERRAL_RPC_URL=https://forno.celo.org
 NEXT_PUBLIC_REFERRAL_AUTH_API_URL=/api/referral/authorize
-NEXT_PUBLIC_MONTHLY_PASS_PRICE=10000000
-NEXT_PUBLIC_MONTHLY_PASS_RECIPIENT=0x...
 REFERRAL_CLAIM_SIGNER_PRIVATE_KEY=0x...
 REFERRAL_SIGNATURE_TTL_SECONDS=900
 FARCASTER_ACCOUNT_ASSOCIATION_HEADER=...
@@ -123,8 +120,6 @@ FARCASTER_ACCOUNT_ASSOCIATION_SIGNATURE=...
 ```
 
 `REFERRAL_CLAIM_SIGNER_PRIVATE_KEY` non deve mai essere `NEXT_PUBLIC`. Non serve tenerci CELO se usi la modalita firma: il signer autorizza, mentre l'utente invia la transazione `register(...)` su Celo.
-
-`NEXT_PUBLIC_MONTHLY_PASS_RECIPIENT` abilita il bottone "Buy monthly pass using PAPPARDELLE". La UI invia `NEXT_PUBLIC_MONTHLY_PASS_PRICE` token PAPPARDELLE a quell'indirizzo tramite `transfer()` ERC-20 su Base.
 
 ## MiniPay e Farcaster
 
