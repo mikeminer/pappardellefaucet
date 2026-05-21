@@ -19,6 +19,8 @@ Vault faucet deployato:
 - Il contratto `PappardelleFaucetVault` custodisce i token.
 - Ogni wallet puo chiamare `claim()` una sola volta.
 - Il limite e salvato on-chain in `hasClaimed(address)`.
+- Il contratto opzionale `PappardelleReferralRegistry` registra il referrer dopo il claim e assegna punti on-chain per un futuro airdrop.
+- La UI legge `?ref=0x...`, registra i punti dopo il claim e mostra la leaderboard dei migliori referrer.
 - Vercel ospita solo la UI, quindi non serve mettere una private key nel frontend.
 - Il proprietario puo mettere in pausa il faucet, cambiare `claimAmount` e ritirare token dal vault.
 
@@ -60,12 +62,32 @@ Dopo il deploy:
 2. Imposta `NEXT_PUBLIC_FAUCET_ADDRESS` con l'indirizzo del vault.
 3. Deploya la web app su Vercel.
 
+## Deploy referral registry
+
+Il registry e separato dal vault gia deployato, quindi puoi aggiungerlo senza cambiare il faucet esistente.
+
+Imposta:
+
+```text
+FAUCET_ADDRESS=0xCE749CDe53b8E6791F300555d9ee8b1Df9B21f65
+REFERRAL_POINTS_PER_CLAIM=1
+```
+
+Poi:
+
+```bash
+pnpm run deploy:referral:base
+```
+
+Dopo il deploy imposta `NEXT_PUBLIC_REFERRAL_REGISTRY_ADDRESS` su Vercel e ridistribuisci la web app.
+
 ## Variabili Vercel
 
 ```text
 NEXT_PUBLIC_BASE_RPC_URL=https://mainnet.base.org
 NEXT_PUBLIC_TOKEN_ADDRESS=0x41859a1048fb4f8d668861b1249504bf52e6d3bd
 NEXT_PUBLIC_FAUCET_ADDRESS=0xCE749CDe53b8E6791F300555d9ee8b1Df9B21f65
+NEXT_PUBLIC_REFERRAL_REGISTRY_ADDRESS=0x...
 ```
 
 ## Nota anti-abuso

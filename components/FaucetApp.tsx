@@ -5,14 +5,18 @@ import {
   AlertTriangle,
   CheckCircle2,
   Coins,
+  Copy,
   Droplets,
   ExternalLink,
+  Gift,
   Info,
   Loader2,
   Mail,
   PlugZap,
   ShieldCheck,
+  Trophy,
   Utensils,
+  UserPlus,
   Wallet,
   X
 } from "lucide-react";
@@ -27,8 +31,16 @@ import {
   parseUnits,
   zeroAddress
 } from "viem";
-import { appChain, appChainIdHex, appChainParams, baseRpcUrls, faucetAddress, tokenAddress } from "@/lib/chains";
-import { erc20Abi, faucetVaultAbi } from "@/lib/abi";
+import {
+  appChain,
+  appChainIdHex,
+  appChainParams,
+  baseRpcUrls,
+  faucetAddress,
+  referralRegistryAddress,
+  tokenAddress
+} from "@/lib/chains";
+import { erc20Abi, faucetVaultAbi, referralRegistryAbi } from "@/lib/abi";
 import { compactAddress, formatCount, formatTokenAmount } from "@/lib/format";
 
 type EthereumProvider = {
@@ -49,6 +61,23 @@ type Snapshot = {
   paused?: boolean;
 };
 
+type ReferralSnapshot = {
+  pointsPerReferral?: bigint;
+  totalRegisteredReferrals?: bigint;
+  referralRegistered?: boolean;
+  referredBy?: Address;
+  points?: bigint;
+  referrals?: bigint;
+  lastReferralAt?: bigint;
+};
+
+type LeaderboardEntry = {
+  account: Address;
+  points: bigint;
+  referrals: bigint;
+  lastReferralAt: bigint;
+};
+
 declare global {
   interface Window {
     ethereum?: EthereumProvider;
@@ -57,9 +86,21 @@ declare global {
 
 const configuredFaucetAddress =
   faucetAddress && isAddress(faucetAddress) ? (faucetAddress as Address) : undefined;
+const configuredReferralRegistryAddress =
+  referralRegistryAddress && isAddress(referralRegistryAddress)
+    ? (referralRegistryAddress as Address)
+    : undefined;
 const faucetSiteUrl = "https://pappardellefaucet.vercel.app/";
 const rektaurantUrl = "https://rektaurant.vercel.app/";
 const zoraUrl = "https://zora.co/@pappardelle/creator-coin";
+
+function isSameAddress(left?: Address, right?: Address) {
+  return Boolean(left && right && left.toLowerCase() === right.toLowerCase());
+}
+
+function formatPoints(value?: bigint) {
+  return value?.toString() || "0";
+}
 
 function getErrorMessage(error: unknown) {
   if (error && typeof error === "object") {
@@ -91,6 +132,12 @@ export function FaucetApp() {
   const [showInvitation, setShowInvitation] = useState(false);
   const [donationAmount, setDonationAmount] = useState("");
   const [isDonating, setIsDonating] = useState(false);
+  const [pendingReferrer, setPendingReferrer] = useState<Address>();
+  const [referralSnapshot, setReferralSnapshot] = useState<ReferralSnapshot>({});
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [referralError, setReferralError] = useState<string>();
+  const [copyStatus, setCopyStatus] = useState<string>();
+  const [isRegisteringReferral, setIsRegisteringReferral] = useState(false);
 
   const publicClient = useMemo(
     () =>
@@ -196,6 +243,103 @@ export function FaucetApp() {
     [account, publicClient]
   );
 
+  const refreshReferralData = useCallback(
+    async (activeAccount = account) => {
+      setReferralError(undefined);
+
+      if (!configuredReferralRegistryAddress) {
+        setReferralSnapshot({});
+        setLeaderboard([]);
+        return;
+      }
+
+      try {
+        const [pointsPerReferral, totalRegisteredReferrals, topResult] = await Promise.all([
+          publicClient.readContract({
+            address: configuredReferralRegistryAddress,
+            abi: referralRegistryAbi,
+            functionName: "pointsPerReferral"
+          }),
+          publicClient.readContract({
+            address: configuredReferralRegistryAddress,
+            abi: referralRegistryAbi,
+            functionName: "totalRegisteredReferrals"
+          }),
+          publicClient.readContract({
+            address: configuredReferralRegistryAddress,
+            abi: referralRegistryAbi,
+            functionName: "topReferrers",
+            args: [10n]
+          })
+        ]);
+
+        const [leaderAccounts, leaderPoints, leaderReferrals, leaderLastReferralAts] = topResult as readonly [
+          readonly Address[],
+          readonly bigint[],
+          readonly bigint[],
+          readonly bigint[]
+        ];
+
+        setLeaderboard(
+          leaderAccounts.map((leaderAccount, index) => ({
+            account: leaderAccount,
+            points: leaderPoints[index] || 0n,
+            referrals: leaderReferrals[index] || 0n,
+            lastReferralAt: leaderLastReferralAts[index] || 0n
+          }))
+        );
+
+        if (!activeAccount) {
+          setReferralSnapshot({
+            pointsPerReferral,
+            totalRegisteredReferrals,
+            referralRegistered: false,
+            points: 0n,
+            referrals: 0n,
+            lastReferralAt: 0n
+          });
+          return;
+        }
+
+        const [registered, referrer, statsResult] = await Promise.all([
+          publicClient.readContract({
+            address: configuredReferralRegistryAddress,
+            abi: referralRegistryAbi,
+            functionName: "referralRegistered",
+            args: [activeAccount]
+          }),
+          publicClient.readContract({
+            address: configuredReferralRegistryAddress,
+            abi: referralRegistryAbi,
+            functionName: "referredBy",
+            args: [activeAccount]
+          }),
+          publicClient.readContract({
+            address: configuredReferralRegistryAddress,
+            abi: referralRegistryAbi,
+            functionName: "statsOf",
+            args: [activeAccount]
+          })
+        ]);
+
+        const [points, referrals, lastReferralAt] = statsResult as readonly [bigint, bigint, bigint];
+
+        setReferralSnapshot({
+          pointsPerReferral,
+          totalRegisteredReferrals,
+          referralRegistered: registered,
+          referredBy: referrer === zeroAddress ? undefined : referrer,
+          points,
+          referrals,
+          lastReferralAt
+        });
+      } catch (referralRefreshError) {
+        setReferralError(getErrorMessage(referralRefreshError));
+      }
+    },
+    [account, publicClient]
+  );
+
   const checkNetwork = useCallback(async () => {
     const provider = window.ethereum;
     if (!provider) {
@@ -260,12 +404,73 @@ export function FaucetApp() {
 
       setStatus("Wallet connected on Base.");
       await refresh(nextAccount);
+      await refreshReferralData(nextAccount);
     } catch (connectError) {
       setError(getErrorMessage(connectError));
     } finally {
       setIsConnecting(false);
     }
-  }, [checkNetwork, refresh, requestAccount, switchToBase]);
+  }, [checkNetwork, refresh, refreshReferralData, requestAccount, switchToBase]);
+
+  const registerReferral = useCallback(
+    async (activeAccount: Address, referrer: Address, provider: EthereumProvider) => {
+      if (!configuredReferralRegistryAddress) {
+        return false;
+      }
+
+      if (isSameAddress(activeAccount, referrer)) {
+        setReferralError("Self referrals do not earn airdrop points.");
+        return false;
+      }
+
+      setIsRegisteringReferral(true);
+      setReferralError(undefined);
+
+      try {
+        const alreadyRegistered = await publicClient.readContract({
+          address: configuredReferralRegistryAddress,
+          abi: referralRegistryAbi,
+          functionName: "referralRegistered",
+          args: [activeAccount]
+        });
+
+        if (alreadyRegistered) {
+          setStatus("Referral points already registered.");
+          await refreshReferralData(activeAccount);
+          return false;
+        }
+
+        setStatus("Confirm referral points in your wallet.");
+
+        const walletClient = createWalletClient({
+          account: activeAccount,
+          chain: appChain,
+          transport: custom(provider)
+        });
+
+        const hash = await walletClient.writeContract({
+          address: configuredReferralRegistryAddress,
+          abi: referralRegistryAbi,
+          functionName: "register",
+          args: [referrer]
+        });
+
+        setTxHash(hash);
+        setStatus("Referral sent. Waiting for Base confirmation.");
+
+        await publicClient.waitForTransactionReceipt({ hash });
+        setStatus(`Referral points added for ${compactAddress(referrer)}.`);
+        await refreshReferralData(activeAccount);
+        return true;
+      } catch (referralRegisterError) {
+        setReferralError(getErrorMessage(referralRegisterError));
+        return false;
+      } finally {
+        setIsRegisteringReferral(false);
+      }
+    },
+    [publicClient, refreshReferralData]
+  );
 
   const donateToFaucet = useCallback(async () => {
     setError(undefined);
@@ -367,18 +572,43 @@ export function FaucetApp() {
 
       await publicClient.waitForTransactionReceipt({ hash });
       setStatus("Serving claimed.");
+      if (
+        pendingReferrer &&
+        configuredReferralRegistryAddress &&
+        !isSameAddress(activeAccount, pendingReferrer)
+      ) {
+        await registerReferral(activeAccount, pendingReferrer, provider);
+      }
       setShowInvitation(true);
       await refresh(activeAccount);
+      await refreshReferralData(activeAccount);
     } catch (claimError) {
       setError(getErrorMessage(claimError));
     } finally {
       setIsClaiming(false);
     }
-  }, [account, publicClient, refresh, requestAccount, switchToBase]);
+  }, [
+    account,
+    pendingReferrer,
+    publicClient,
+    refresh,
+    refreshReferralData,
+    registerReferral,
+    requestAccount,
+    switchToBase
+  ]);
 
   useEffect(() => {
     refresh().catch(() => undefined);
-  }, [refresh]);
+    refreshReferralData().catch(() => undefined);
+  }, [refresh, refreshReferralData]);
+
+  useEffect(() => {
+    const referrer = new URLSearchParams(window.location.search).get("ref");
+    if (referrer && isAddress(referrer)) {
+      setPendingReferrer(referrer as Address);
+    }
+  }, []);
 
   useEffect(() => {
     checkNetwork().catch(() => undefined);
@@ -394,11 +624,13 @@ export function FaucetApp() {
 
       setAccount(nextAccount);
       refresh(nextAccount).catch(() => undefined);
+      refreshReferralData(nextAccount).catch(() => undefined);
     };
 
     const handleChainChanged = () => {
       checkNetwork().catch(() => undefined);
       refresh().catch(() => undefined);
+      refreshReferralData().catch(() => undefined);
     };
 
     provider.on("accountsChanged", handleAccountsChanged);
@@ -408,7 +640,7 @@ export function FaucetApp() {
       provider.removeListener?.("accountsChanged", handleAccountsChanged);
       provider.removeListener?.("chainChanged", handleChainChanged);
     };
-  }, [checkNetwork, refresh]);
+  }, [checkNetwork, refresh, refreshReferralData]);
 
   useEffect(() => {
     if (!showInvitation) return;
@@ -427,11 +659,27 @@ export function FaucetApp() {
   const explorerFaucetUrl = configuredFaucetAddress
     ? `https://basescan.org/address/${configuredFaucetAddress}`
     : undefined;
+  const explorerReferralRegistryUrl = configuredReferralRegistryAddress
+    ? `https://basescan.org/address/${configuredReferralRegistryAddress}`
+    : undefined;
   const explorerTxUrl = txHash ? `https://basescan.org/tx/${txHash}` : undefined;
+  const personalReferralUrl = account ? `${faucetSiteUrl}?ref=${account}` : undefined;
+  const hasValidPendingReferrer = Boolean(
+    pendingReferrer && (!account || !isSameAddress(account, pendingReferrer))
+  );
+  const canRegisterReferral = Boolean(
+    configuredReferralRegistryAddress &&
+      account &&
+      pendingReferrer &&
+      snapshot.hasClaimed &&
+      !referralSnapshot.referralRegistered &&
+      !isSameAddress(account, pendingReferrer)
+  );
 
   const claimDisabled =
     isConnecting ||
     isClaiming ||
+    isRegisteringReferral ||
     isRefreshing ||
     !configuredFaucetAddress ||
     Boolean(snapshot.paused) ||
@@ -450,6 +698,31 @@ export function FaucetApp() {
           : "Claim your serving";
 
   const displaySymbol = snapshot.symbol.toUpperCase();
+
+  const copyReferralLink = useCallback(async () => {
+    if (!personalReferralUrl) return;
+
+    try {
+      await navigator.clipboard.writeText(personalReferralUrl);
+      setCopyStatus("Referral link copied.");
+      window.setTimeout(() => setCopyStatus(undefined), 2200);
+    } catch {
+      setReferralError("Could not copy the referral link from this browser.");
+    }
+  }, [personalReferralUrl]);
+
+  const retryReferralRegistration = useCallback(async () => {
+    if (!account || !pendingReferrer) return;
+
+    const provider = window.ethereum;
+    if (!provider) {
+      setReferralError("Wallet not found.");
+      return;
+    }
+
+    await switchToBase();
+    await registerReferral(account, pendingReferrer, provider);
+  }, [account, pendingReferrer, registerReferral, switchToBase]);
 
   return (
     <div className="app-frame">
@@ -622,6 +895,144 @@ export function FaucetApp() {
         </div>
       </section>
 
+      <section className="referral-section" aria-label="PAPPARDELLE referral airdrop points">
+        <div className="referral-panel">
+          <div className="referral-heading">
+            <div className="referral-icon">
+              <Gift size={24} />
+            </div>
+            <div>
+              <p className="eyebrow">Airdrop points</p>
+              <h2>Referral leaderboard</h2>
+              <p>
+                Share your trattoria link. When a new wallet claims from it, your address earns
+                points for a future PAPPARDELLE airdrop.
+              </p>
+            </div>
+          </div>
+
+          {!configuredReferralRegistryAddress ? (
+            <div className="notice warning">
+              <AlertTriangle size={18} />
+              <span>Referral scoring is ready in the app. Deploy the registry and set NEXT_PUBLIC_REFERRAL_REGISTRY_ADDRESS to activate it.</span>
+            </div>
+          ) : null}
+
+          {hasValidPendingReferrer && pendingReferrer ? (
+            <div className="notice success">
+              <UserPlus size={18} />
+              <span>Referral chef detected: {compactAddress(pendingReferrer)}.</span>
+            </div>
+          ) : null}
+
+          {pendingReferrer && account && isSameAddress(account, pendingReferrer) ? (
+            <div className="notice warning">
+              <AlertTriangle size={18} />
+              <span>Self referrals do not earn airdrop points.</span>
+            </div>
+          ) : null}
+
+          <div className="referral-link-row">
+            <div className="referral-url">
+              <p className="label">Your referral link</p>
+              <strong>{personalReferralUrl || "Connect wallet to cook your link"}</strong>
+            </div>
+            <button className="copy-button" type="button" onClick={copyReferralLink} disabled={!personalReferralUrl}>
+              <Copy size={18} />
+              <span>Copy</span>
+            </button>
+          </div>
+
+          <div className="referral-metrics">
+            <div className="referral-stat">
+              <p className="label">Your points</p>
+              <strong>{formatPoints(referralSnapshot.points)}</strong>
+            </div>
+            <div className="referral-stat">
+              <p className="label">Your referrals</p>
+              <strong>{formatPoints(referralSnapshot.referrals)}</strong>
+            </div>
+            <div className="referral-stat">
+              <p className="label">Points per claim</p>
+              <strong>{formatPoints(referralSnapshot.pointsPerReferral)}</strong>
+            </div>
+            <div className="referral-stat">
+              <p className="label">Registered referrals</p>
+              <strong>{formatPoints(referralSnapshot.totalRegisteredReferrals)}</strong>
+            </div>
+          </div>
+
+          {referralSnapshot.referralRegistered && referralSnapshot.referredBy ? (
+            <div className="notice success">
+              <CheckCircle2 size={18} />
+              <span>Your referral was registered for {compactAddress(referralSnapshot.referredBy)}.</span>
+            </div>
+          ) : null}
+
+          {canRegisterReferral ? (
+            <button
+              className="referral-register-button"
+              type="button"
+              onClick={retryReferralRegistration}
+              disabled={isRegisteringReferral}
+            >
+              {isRegisteringReferral ? <Loader2 className="spin" size={18} /> : <UserPlus size={18} />}
+              <span>Register referral points</span>
+            </button>
+          ) : null}
+
+          {copyStatus ? (
+            <div className="notice success">
+              <CheckCircle2 size={18} />
+              <span>{copyStatus}</span>
+            </div>
+          ) : null}
+
+          {referralError ? (
+            <div className="notice error">
+              <AlertTriangle size={18} />
+              <span>{referralError}</span>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="leaderboard-panel">
+          <div className="leaderboard-heading">
+            <Trophy size={24} />
+            <div>
+              <p className="eyebrow">Future airdrop</p>
+              <h2>Top referrers</h2>
+            </div>
+          </div>
+
+          <div className="leaderboard-list">
+            {leaderboard.length > 0 ? (
+              leaderboard.map((entry, index) => (
+                <a
+                  className="leaderboard-row"
+                  href={`https://basescan.org/address/${entry.account}`}
+                  key={entry.account}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <span className="leaderboard-rank">#{index + 1}</span>
+                  <span className="leaderboard-account">{compactAddress(entry.account)}</span>
+                  <span className="leaderboard-score">
+                    <strong>{formatPoints(entry.points)}</strong>
+                    <small>{formatPoints(entry.referrals)} referrals</small>
+                  </span>
+                </a>
+              ))
+            ) : (
+              <div className="empty-leaderboard">
+                <Trophy size={24} />
+                <span>No referral points yet.</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
       <footer className="contract-row">
         <a href={explorerTokenUrl} target="_blank" rel="noreferrer">
           Token {compactAddress(tokenAddress)}
@@ -630,6 +1041,12 @@ export function FaucetApp() {
         {explorerFaucetUrl ? (
           <a href={explorerFaucetUrl} target="_blank" rel="noreferrer">
             Vault {compactAddress(configuredFaucetAddress || zeroAddress)}
+            <ExternalLink size={15} />
+          </a>
+        ) : null}
+        {explorerReferralRegistryUrl ? (
+          <a href={explorerReferralRegistryUrl} target="_blank" rel="noreferrer">
+            Referrals {compactAddress(configuredReferralRegistryAddress || zeroAddress)}
             <ExternalLink size={15} />
           </a>
         ) : null}

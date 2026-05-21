@@ -8,6 +8,10 @@ export const faucetAddress = process.env.NEXT_PUBLIC_FAUCET_ADDRESS as
   | `0x${string}`
   | undefined;
 
+export const referralRegistryAddress = process.env.NEXT_PUBLIC_REFERRAL_REGISTRY_ADDRESS as
+  | `0x${string}`
+  | undefined;
+
 export const baseRpcUrl = process.env.NEXT_PUBLIC_BASE_RPC_URL || "https://mainnet.base.org";
 export const baseRpcUrls = Array.from(
   new Set([baseRpcUrl, "https://base-rpc.publicnode.com", "https://base.llamarpc.com"])

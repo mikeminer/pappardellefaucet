@@ -70,6 +70,10 @@ a {
   backdrop-filter: blur(2px);
 }
 
+.app-frame > * {
+  min-width: 0;
+}
+
 .topbar,
 .contract-row {
   display: flex;
@@ -82,6 +86,12 @@ a {
   display: flex;
   align-items: center;
   gap: 14px;
+  min-width: 0;
+}
+
+.brand-lockup > div,
+.claim-header > div,
+.promo-banner-copy {
   min-width: 0;
 }
 
@@ -512,6 +522,11 @@ h2 {
   margin-top: 1px;
 }
 
+.notice span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .notice.success {
   border-color: #b8e7c5;
   background: var(--green-soft);
@@ -571,6 +586,221 @@ h2 {
   border-radius: 8px;
   background: #f3ead2;
   color: var(--tomato);
+}
+
+.referral-section {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(310px, 0.65fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.referral-section > * {
+  min-width: 0;
+}
+
+.referral-panel,
+.leaderboard-panel {
+  display: grid;
+  gap: 18px;
+  padding: clamp(20px, 3vw, 30px);
+  border: 1px solid rgba(105, 35, 24, 0.28);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 22px 46px rgba(54, 12, 8, 0.2);
+}
+
+.referral-heading,
+.leaderboard-heading {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.referral-heading > div,
+.leaderboard-heading > div {
+  min-width: 0;
+}
+
+.referral-heading h2,
+.leaderboard-heading h2 {
+  margin-top: 4px;
+  font-size: clamp(2rem, 4vw, 3.2rem);
+}
+
+.referral-heading p:not(.eyebrow) {
+  max-width: 620px;
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-weight: 750;
+  line-height: 1.45;
+}
+
+.referral-icon,
+.leaderboard-heading > svg {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #f3ead2;
+  color: var(--tomato);
+}
+
+.leaderboard-heading > svg {
+  padding: 11px;
+}
+
+.referral-link-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: stretch;
+}
+
+.referral-url {
+  min-height: 62px;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+}
+
+.referral-url strong {
+  color: var(--ink);
+  font-size: 0.98rem;
+  line-height: 1.24;
+  overflow-wrap: anywhere;
+}
+
+.copy-button,
+.referral-register-button {
+  min-height: 48px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.copy-button {
+  align-self: stretch;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  background: #fffaf0;
+  color: var(--ink);
+}
+
+.referral-register-button {
+  width: 100%;
+  padding: 0 18px;
+  background: linear-gradient(180deg, #1f6d3a, #164b2b);
+  color: #ffffff;
+  box-shadow: 0 16px 32px rgba(31, 109, 58, 0.22);
+}
+
+.copy-button:disabled,
+.referral-register-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.referral-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.referral-stat {
+  min-height: 86px;
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  padding: 12px;
+  border-left: 3px solid rgba(161, 39, 29, 0.42);
+  background: rgba(255, 246, 224, 0.64);
+}
+
+.referral-stat strong {
+  color: var(--ink);
+  font-size: 1.45rem;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.leaderboard-list {
+  display: grid;
+  gap: 9px;
+}
+
+.leaderboard-row {
+  min-height: 58px;
+  display: grid;
+  grid-template-columns: 50px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-strong);
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease;
+}
+
+.leaderboard-row:hover {
+  border-color: rgba(161, 39, 29, 0.42);
+  transform: translateY(-1px);
+}
+
+.leaderboard-rank {
+  color: var(--tomato);
+  font-weight: 950;
+}
+
+.leaderboard-account {
+  min-width: 0;
+  color: var(--ink);
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.leaderboard-score {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+.leaderboard-score strong {
+  color: var(--green);
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.leaderboard-score small {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.empty-leaderboard {
+  min-height: 160px;
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  border: 1px dashed rgba(105, 35, 24, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 246, 224, 0.56);
+  color: var(--muted);
+  font-weight: 900;
+  text-align: center;
 }
 
 .contract-row {
@@ -743,6 +973,10 @@ h2 {
     grid-template-columns: 1fr;
   }
 
+  .referral-section {
+    grid-template-columns: 1fr;
+  }
+
   .promo-banner {
     min-height: 280px;
     background-position: 62% center;
@@ -760,6 +994,8 @@ h2 {
 @media (max-width: 560px) {
   .brand-lockup {
     align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
   }
 
   .site-logo {
@@ -786,6 +1022,15 @@ h2 {
 
   .stats-grid {
     grid-template-columns: 1fr;
+  }
+
+  .referral-link-row,
+  .referral-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .copy-button {
+    width: 100%;
   }
 
   .action-grid {

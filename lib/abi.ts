@@ -83,3 +83,64 @@ export const erc20Abi = [
     outputs: [{ type: "bool" }]
   }
 ] as const;
+
+export const referralRegistryAbi = [
+  {
+    type: "function",
+    name: "register",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "referrer", type: "address" }],
+    outputs: [{ name: "pointsAwarded", type: "uint256" }]
+  },
+  {
+    type: "function",
+    name: "pointsPerReferral",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint256" }]
+  },
+  {
+    type: "function",
+    name: "totalRegisteredReferrals",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "uint256" }]
+  },
+  {
+    type: "function",
+    name: "referralRegistered",
+    stateMutability: "view",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ type: "bool" }]
+  },
+  {
+    type: "function",
+    name: "referredBy",
+    stateMutability: "view",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ type: "address" }]
+  },
+  {
+    type: "function",
+    name: "statsOf",
+    stateMutability: "view",
+    inputs: [{ name: "referrer", type: "address" }],
+    outputs: [
+      { name: "points", type: "uint256" },
+      { name: "referrals", type: "uint256" },
+      { name: "lastReferralAt", type: "uint256" }
+    ]
+  },
+  {
+    type: "function",
+    name: "topReferrers",
+    stateMutability: "view",
+    inputs: [{ name: "limit", type: "uint256" }],
+    outputs: [
+      { name: "accounts", type: "address[]" },
+      { name: "points", type: "uint256[]" },
+      { name: "referrals", type: "uint256[]" },
+      { name: "lastReferralAts", type: "uint256[]" }
+    ]
+  }
+] as const;
