@@ -6,6 +6,7 @@ import {
   siteLogo,
   siteLogoAbsolute,
   siteName,
+  siteOgImageAbsolute,
   siteOrigin,
   siteTitle,
   siteUrl,
@@ -55,10 +56,10 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: siteLogoAbsolute,
-        width: 512,
-        height: 512,
-        alt: "PAPPARDELLE plate with crypto meatballs"
+        url: siteOgImageAbsolute,
+        width: 1200,
+        height: 630,
+        alt: "PAPPARDELLE Faucet Mini App with crypto meatballs"
       }
     ]
   },
@@ -68,8 +69,8 @@ export const metadata: Metadata = {
     description: siteDescription,
     images: [
       {
-        url: siteLogoAbsolute,
-        alt: "PAPPARDELLE plate with crypto meatballs"
+        url: siteOgImageAbsolute,
+        alt: "PAPPARDELLE Faucet Mini App with crypto meatballs"
       }
     ]
   }

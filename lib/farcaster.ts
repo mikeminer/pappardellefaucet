@@ -2,6 +2,7 @@ import {
   siteDescription,
   siteLogoAbsolute,
   siteName,
+  siteOgImageAbsolute,
   siteOrigin,
   siteTitle,
   siteUrl
@@ -9,6 +10,14 @@ import {
 
 const frameImageUrl = `${siteOrigin}/images/pappardelle-faucet-banner.png`;
 const miniAppName = "PAPPARDELLE Faucet";
+const miniAppTagline = "Claim crypto meatballs on Base";
+const miniAppOgDescription =
+  "Claim PAPPARDELLE once per wallet on Base. Earn referral points and buy monthly passes with crypto meatballs from pappardelle.eth.";
+const miniAppScreenshotUrls = [
+  `${siteOrigin}/images/farcaster-screenshot-claim.jpg`,
+  `${siteOrigin}/images/farcaster-screenshot-zora.jpg`,
+  `${siteOrigin}/images/farcaster-screenshot-pass.jpg`
+];
 
 const defaultAccountAssociation = {
   header:
@@ -37,12 +46,20 @@ export const farcasterFrame = {
   webhookUrl: `${siteOrigin}/api/farcaster/webhook`,
   subtitle: "Crypto meatballs on Base",
   description: siteDescription,
+  screenshotUrls: miniAppScreenshotUrls,
   primaryCategory: "finance",
-  tags: ["base", "celo", "faucet", "pappardelle"]
+  tags: ["base", "celo", "faucet", "pappardelle"],
+  heroImageUrl: siteOgImageAbsolute,
+  tagline: miniAppTagline,
+  ogTitle: "PAPPARDELLE Faucet on Base",
+  ogDescription: miniAppOgDescription,
+  ogImageUrl: siteOgImageAbsolute,
+  castShareUrl: siteUrl
 };
 
 export const farcasterManifest = {
   ...(accountAssociation ? { accountAssociation } : {}),
+  miniapp: farcasterFrame,
   frame: farcasterFrame
 };
 
