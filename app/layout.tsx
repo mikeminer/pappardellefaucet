@@ -1,5 +1,15 @@
 import type { Metadata } from "next";
-import { siteDescription, siteKeywords, siteLogo, siteLogoAbsolute, siteName, siteOrigin, siteTitle, siteUrl } from "@/lib/seo";
+import {
+  siteDescription,
+  siteKeywords,
+  siteLogo,
+  siteLogoAbsolute,
+  siteName,
+  siteOrigin,
+  siteTitle,
+  siteUrl,
+  talentAppProjectVerification
+} from "@/lib/seo";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -11,6 +21,9 @@ export const metadata: Metadata = {
   category: "Web3",
   creator: "pappardelle.eth",
   publisher: "pappardelle.eth",
+  other: {
+    "talentapp:project_verification": talentAppProjectVerification
+  },
   alternates: {
     canonical: siteUrl
   },
