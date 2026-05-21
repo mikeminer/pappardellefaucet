@@ -89,8 +89,38 @@ export const referralRegistryAbi = [
     type: "function",
     name: "register",
     stateMutability: "nonpayable",
-    inputs: [{ name: "referrer", type: "address" }],
+    inputs: [
+      { name: "referrer", type: "address" },
+      { name: "baseClaimTxHash", type: "bytes32" },
+      { name: "deadline", type: "uint256" },
+      { name: "signature", type: "bytes" }
+    ],
     outputs: [{ name: "pointsAwarded", type: "uint256" }]
+  },
+  {
+    type: "function",
+    name: "recordReferral",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "account", type: "address" },
+      { name: "referrer", type: "address" },
+      { name: "baseClaimTxHash", type: "bytes32" }
+    ],
+    outputs: [{ name: "pointsAwarded", type: "uint256" }]
+  },
+  {
+    type: "function",
+    name: "claimSigner",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ type: "address" }]
+  },
+  {
+    type: "function",
+    name: "baseClaimTxHashUsed",
+    stateMutability: "view",
+    inputs: [{ name: "baseClaimTxHash", type: "bytes32" }],
+    outputs: [{ type: "bool" }]
   },
   {
     type: "function",

@@ -11,6 +11,7 @@
     "compile": "hardhat compile",
     "deploy:base": "hardhat run scripts/deploy.ts --network base",
     "deploy:base-sepolia": "hardhat run scripts/deploy.ts --network baseSepolia",
+    "deploy:referral:celo": "hardhat run scripts/deploy-referral-registry.ts --network celo",
     "deploy:referral:base": "hardhat run scripts/deploy-referral-registry.ts --network base",
     "deploy:referral:base-sepolia": "hardhat run scripts/deploy-referral-registry.ts --network baseSepolia"
   },

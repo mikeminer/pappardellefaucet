@@ -37,6 +37,11 @@ import {
   appChainParams,
   baseRpcUrls,
   faucetAddress,
+  referralAuthApiUrl,
+  referralChain,
+  referralChainIdHex,
+  referralChainParams,
+  referralRpcUrls,
   referralRegistryAddress,
   tokenAddress
 } from "@/lib/chains";
@@ -78,6 +83,13 @@ type LeaderboardEntry = {
   lastReferralAt: bigint;
 };
 
+type ReferralAuthorizationResponse = {
+  mode?: "signature" | "recorded";
+  signature?: `0x${string}`;
+  deadline?: string | number;
+  baseClaimTxHash?: `0x${string}`;
+};
+
 declare global {
   interface Window {
     ethereum?: EthereumProvider;
@@ -100,6 +112,14 @@ function isSameAddress(left?: Address, right?: Address) {
 
 function formatPoints(value?: bigint) {
   return value?.toString() || "0";
+}
+
+function isBytes32Hex(value: unknown): value is `0x${string}` {
+  return typeof value === "string" && /^0x[0-9a-fA-F]{64}$/.test(value);
+}
+
+function isHexString(value: unknown): value is `0x${string}` {
+  return typeof value === "string" && /^0x[0-9a-fA-F]+$/.test(value);
 }
 
 function getErrorMessage(error: unknown) {
@@ -129,6 +149,8 @@ export function FaucetApp() {
   const [error, setError] = useState<string>();
   const [status, setStatus] = useState<string>();
   const [txHash, setTxHash] = useState<`0x${string}`>();
+  const [txChain, setTxChain] = useState<"base" | "celo">("base");
+  const [lastClaimTxHash, setLastClaimTxHash] = useState<`0x${string}`>();
   const [showInvitation, setShowInvitation] = useState(false);
   const [donationAmount, setDonationAmount] = useState("");
   const [isDonating, setIsDonating] = useState(false);
@@ -144,6 +166,15 @@ export function FaucetApp() {
       createPublicClient({
         chain: appChain,
         transport: fallback(baseRpcUrls.map((url) => http(url)))
+      }),
+    []
+  );
+
+  const referralPublicClient = useMemo(
+    () =>
+      createPublicClient({
+        chain: referralChain,
+        transport: fallback(referralRpcUrls.map((url) => http(url)))
       }),
     []
   );
@@ -255,17 +286,17 @@ export function FaucetApp() {
 
       try {
         const [pointsPerReferral, totalRegisteredReferrals, topResult] = await Promise.all([
-          publicClient.readContract({
+          referralPublicClient.readContract({
             address: configuredReferralRegistryAddress,
             abi: referralRegistryAbi,
             functionName: "pointsPerReferral"
           }),
-          publicClient.readContract({
+          referralPublicClient.readContract({
             address: configuredReferralRegistryAddress,
             abi: referralRegistryAbi,
             functionName: "totalRegisteredReferrals"
           }),
-          publicClient.readContract({
+          referralPublicClient.readContract({
             address: configuredReferralRegistryAddress,
             abi: referralRegistryAbi,
             functionName: "topReferrers",
@@ -302,19 +333,19 @@ export function FaucetApp() {
         }
 
         const [registered, referrer, statsResult] = await Promise.all([
-          publicClient.readContract({
+          referralPublicClient.readContract({
             address: configuredReferralRegistryAddress,
             abi: referralRegistryAbi,
             functionName: "referralRegistered",
             args: [activeAccount]
           }),
-          publicClient.readContract({
+          referralPublicClient.readContract({
             address: configuredReferralRegistryAddress,
             abi: referralRegistryAbi,
             functionName: "referredBy",
             args: [activeAccount]
           }),
-          publicClient.readContract({
+          referralPublicClient.readContract({
             address: configuredReferralRegistryAddress,
             abi: referralRegistryAbi,
             functionName: "statsOf",
@@ -337,7 +368,7 @@ export function FaucetApp() {
         setReferralError(getErrorMessage(referralRefreshError));
       }
     },
-    [account, publicClient]
+    [account, referralPublicClient]
   );
 
   const checkNetwork = useCallback(async () => {
@@ -373,6 +404,26 @@ export function FaucetApp() {
     }
 
     setNetworkOk(true);
+  }, []);
+
+  const switchToReferralChain = useCallback(async () => {
+    const provider = window.ethereum;
+    if (!provider) throw new Error("Wallet not found.");
+
+    try {
+      await provider.request({
+        method: "wallet_switchEthereumChain",
+        params: [{ chainId: referralChainIdHex }]
+      });
+    } catch (switchError) {
+      const maybeError = switchError as { code?: number };
+      if (maybeError.code !== 4902) throw switchError;
+
+      await provider.request({
+        method: "wallet_addEthereumChain",
+        params: [referralChainParams]
+      });
+    }
   }, []);
 
   const requestAccount = useCallback(async () => {
@@ -413,8 +464,18 @@ export function FaucetApp() {
   }, [checkNetwork, refresh, refreshReferralData, requestAccount, switchToBase]);
 
   const registerReferral = useCallback(
-    async (activeAccount: Address, referrer: Address, provider: EthereumProvider) => {
+    async (
+      activeAccount: Address,
+      referrer: Address,
+      baseClaimTxHash: `0x${string}`,
+      provider: EthereumProvider
+    ) => {
       if (!configuredReferralRegistryAddress) {
+        return false;
+      }
+
+      if (!referralAuthApiUrl) {
+        setReferralError("Celo referral scoring needs a registrar API to verify the Base claim before points can be written.");
         return false;
       }
 
@@ -427,7 +488,7 @@ export function FaucetApp() {
       setReferralError(undefined);
 
       try {
-        const alreadyRegistered = await publicClient.readContract({
+        const alreadyRegistered = await referralPublicClient.readContract({
           address: configuredReferralRegistryAddress,
           abi: referralRegistryAbi,
           functionName: "referralRegistered",
@@ -440,11 +501,51 @@ export function FaucetApp() {
           return false;
         }
 
-        setStatus("Confirm referral points in your wallet.");
+        const authorizationResponse = await fetch(referralAuthApiUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            account: activeAccount,
+            referrer,
+            baseClaimTxHash
+          })
+        });
+
+        if (!authorizationResponse.ok) {
+          throw new Error("The referral registrar could not verify this Base claim yet.");
+        }
+
+        const authorization = (await authorizationResponse.json()) as ReferralAuthorizationResponse;
+
+        if (authorization.mode === "recorded") {
+          setStatus("Referral points are being recorded on Celo by the registrar.");
+          await refreshReferralData(activeAccount);
+          return true;
+        }
+
+        if (!isHexString(authorization.signature)) {
+          throw new Error("The referral registrar did not return a valid signature.");
+        }
+
+        const attestedClaimHash = authorization.baseClaimTxHash || baseClaimTxHash;
+        if (!isBytes32Hex(attestedClaimHash)) {
+          throw new Error("The referral registrar did not return a valid Base claim hash.");
+        }
+
+        if (authorization.deadline === undefined) {
+          throw new Error("The referral registrar did not return a signature deadline.");
+        }
+
+        const deadline = BigInt(authorization.deadline);
+
+        setStatus("Confirm Celo referral points in your wallet.");
+        await switchToReferralChain();
 
         const walletClient = createWalletClient({
           account: activeAccount,
-          chain: appChain,
+          chain: referralChain,
           transport: custom(provider)
         });
 
@@ -452,13 +553,14 @@ export function FaucetApp() {
           address: configuredReferralRegistryAddress,
           abi: referralRegistryAbi,
           functionName: "register",
-          args: [referrer]
+          args: [referrer, attestedClaimHash, deadline, authorization.signature]
         });
 
+        setTxChain("celo");
         setTxHash(hash);
-        setStatus("Referral sent. Waiting for Base confirmation.");
+        setStatus("Referral sent. Waiting for Celo confirmation.");
 
-        await publicClient.waitForTransactionReceipt({ hash });
+        await referralPublicClient.waitForTransactionReceipt({ hash });
         setStatus(`Referral points added for ${compactAddress(referrer)}.`);
         await refreshReferralData(activeAccount);
         return true;
@@ -469,7 +571,7 @@ export function FaucetApp() {
         setIsRegisteringReferral(false);
       }
     },
-    [publicClient, refreshReferralData]
+    [referralPublicClient, refreshReferralData, switchToReferralChain]
   );
 
   const donateToFaucet = useCallback(async () => {
@@ -522,6 +624,7 @@ export function FaucetApp() {
         args: [configuredFaucetAddress, parsedDonationAmount]
       });
 
+      setTxChain("base");
       setTxHash(hash);
       setStatus("Donation sent. Waiting for Base confirmation.");
 
@@ -567,7 +670,9 @@ export function FaucetApp() {
         functionName: "claim"
       });
 
+      setTxChain("base");
       setTxHash(hash);
+      setLastClaimTxHash(hash);
       setStatus("Transaction sent. Waiting for Base confirmation.");
 
       await publicClient.waitForTransactionReceipt({ hash });
@@ -577,7 +682,7 @@ export function FaucetApp() {
         configuredReferralRegistryAddress &&
         !isSameAddress(activeAccount, pendingReferrer)
       ) {
-        await registerReferral(activeAccount, pendingReferrer, provider);
+        await registerReferral(activeAccount, pendingReferrer, hash, provider);
       }
       setShowInvitation(true);
       await refresh(activeAccount);
@@ -660,9 +765,11 @@ export function FaucetApp() {
     ? `https://basescan.org/address/${configuredFaucetAddress}`
     : undefined;
   const explorerReferralRegistryUrl = configuredReferralRegistryAddress
-    ? `https://basescan.org/address/${configuredReferralRegistryAddress}`
+    ? `https://celoscan.io/address/${configuredReferralRegistryAddress}`
     : undefined;
-  const explorerTxUrl = txHash ? `https://basescan.org/tx/${txHash}` : undefined;
+  const explorerTxUrl = txHash
+    ? `${txChain === "celo" ? "https://celoscan.io/tx/" : "https://basescan.org/tx/"}${txHash}`
+    : undefined;
   const personalReferralUrl = account ? `${faucetSiteUrl}?ref=${account}` : undefined;
   const hasValidPendingReferrer = Boolean(
     pendingReferrer && (!account || !isSameAddress(account, pendingReferrer))
@@ -671,6 +778,7 @@ export function FaucetApp() {
     configuredReferralRegistryAddress &&
       account &&
       pendingReferrer &&
+      lastClaimTxHash &&
       snapshot.hasClaimed &&
       !referralSnapshot.referralRegistered &&
       !isSameAddress(account, pendingReferrer)
@@ -712,7 +820,7 @@ export function FaucetApp() {
   }, [personalReferralUrl]);
 
   const retryReferralRegistration = useCallback(async () => {
-    if (!account || !pendingReferrer) return;
+    if (!account || !pendingReferrer || !lastClaimTxHash) return;
 
     const provider = window.ethereum;
     if (!provider) {
@@ -720,9 +828,8 @@ export function FaucetApp() {
       return;
     }
 
-    await switchToBase();
-    await registerReferral(account, pendingReferrer, provider);
-  }, [account, pendingReferrer, registerReferral, switchToBase]);
+    await registerReferral(account, pendingReferrer, lastClaimTxHash, provider);
+  }, [account, lastClaimTxHash, pendingReferrer, registerReferral]);
 
   return (
     <div className="app-frame">
@@ -821,7 +928,7 @@ export function FaucetApp() {
 
           {explorerTxUrl ? (
             <a className="inline-link" href={explorerTxUrl} target="_blank" rel="noreferrer">
-              View transaction on BaseScan
+              View transaction on {txChain === "celo" ? "CeloScan" : "BaseScan"}
               <ExternalLink size={16} />
             </a>
           ) : null}
@@ -914,7 +1021,14 @@ export function FaucetApp() {
           {!configuredReferralRegistryAddress ? (
             <div className="notice warning">
               <AlertTriangle size={18} />
-              <span>Referral scoring is ready in the app. Deploy the registry and set NEXT_PUBLIC_REFERRAL_REGISTRY_ADDRESS to activate it.</span>
+              <span>Referral scoring is ready for Celo. Deploy the registry on Celo mainnet and set NEXT_PUBLIC_REFERRAL_REGISTRY_ADDRESS to activate the leaderboard.</span>
+            </div>
+          ) : null}
+
+          {configuredReferralRegistryAddress && !referralAuthApiUrl ? (
+            <div className="notice warning">
+              <AlertTriangle size={18} />
+              <span>Leaderboard reads from Celo. To write points after Base claims, connect a registrar API that verifies the Base claim and authorizes the Celo registry.</span>
             </div>
           ) : null}
 
@@ -977,7 +1091,7 @@ export function FaucetApp() {
               disabled={isRegisteringReferral}
             >
               {isRegisteringReferral ? <Loader2 className="spin" size={18} /> : <UserPlus size={18} />}
-              <span>Register referral points</span>
+              <span>Sync Celo referral points</span>
             </button>
           ) : null}
 

@@ -1,21 +1,30 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
-interface IPappardelleFaucetVault {
-    function hasClaimed(address account) external view returns (bool);
-}
-
 contract PappardelleReferralRegistry is Ownable, ReentrancyGuard {
-    IPappardelleFaucetVault public immutable faucetVault;
+    bytes32 private constant EIP712_DOMAIN_TYPEHASH = keccak256(
+        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+    );
+    bytes32 private constant NAME_HASH = keccak256("PappardelleReferralRegistry");
+    bytes32 private constant VERSION_HASH = keccak256("1");
+    bytes32 public constant REFERRAL_AUTHORIZATION_TYPEHASH = keccak256(
+        "ReferralAuthorization(address account,address referrer,bytes32 baseClaimTxHash,uint256 deadline)"
+    );
 
+    bytes32 private immutable _domainSeparator;
+
+    address public claimSigner;
     uint256 public pointsPerReferral;
     uint256 public totalRegisteredReferrals;
 
     mapping(address account => address referrer) public referredBy;
     mapping(address account => bool registered) public referralRegistered;
+    mapping(address registrar => bool allowed) public registrars;
+    mapping(bytes32 baseClaimTxHash => bool used) public baseClaimTxHashUsed;
 
     struct ReferralStats {
         uint256 points;
@@ -30,51 +39,102 @@ contract PappardelleReferralRegistry is Ownable, ReentrancyGuard {
     event ReferralRegistered(
         address indexed account,
         address indexed referrer,
+        bytes32 indexed baseClaimTxHash,
         uint256 pointsAwarded,
         uint256 totalPoints,
         uint256 totalReferrals
     );
+    event ClaimSignerUpdated(address indexed previousSigner, address indexed newSigner);
+    event RegistrarUpdated(address indexed registrar, bool allowed);
     event PointsPerReferralUpdated(uint256 previousPoints, uint256 newPoints);
 
     error ZeroAddress();
+    error ZeroHash();
     error ZeroPoints();
     error SelfReferral();
     error ReferralAlreadyRegistered(address account);
-    error ClaimRequired(address account);
+    error ClaimHashAlreadyUsed(bytes32 baseClaimTxHash);
+    error SignatureExpired(uint256 deadline);
+    error InvalidSignature();
+    error NotRegistrar(address account);
     error LeaderboardLimitTooLarge(uint256 limit, uint256 maxLimit);
 
-    constructor(address faucetVaultAddress, uint256 initialPointsPerReferral) Ownable(msg.sender) {
-        if (faucetVaultAddress == address(0)) revert ZeroAddress();
-        if (initialPointsPerReferral == 0) revert ZeroPoints();
-
-        faucetVault = IPappardelleFaucetVault(faucetVaultAddress);
-        pointsPerReferral = initialPointsPerReferral;
+    modifier onlyRegistrar() {
+        if (msg.sender != owner() && !registrars[msg.sender]) revert NotRegistrar(msg.sender);
+        _;
     }
 
-    function register(address referrer) external nonReentrant returns (uint256 pointsAwarded) {
+    constructor(address initialClaimSigner, uint256 initialPointsPerReferral) Ownable(msg.sender) {
+        if (initialClaimSigner == address(0)) revert ZeroAddress();
+        if (initialPointsPerReferral == 0) revert ZeroPoints();
+
+        _domainSeparator = keccak256(
+            abi.encode(
+                EIP712_DOMAIN_TYPEHASH,
+                NAME_HASH,
+                VERSION_HASH,
+                block.chainid,
+                address(this)
+            )
+        );
+        claimSigner = initialClaimSigner;
+        pointsPerReferral = initialPointsPerReferral;
+        registrars[initialClaimSigner] = true;
+
+        emit RegistrarUpdated(initialClaimSigner, true);
+    }
+
+    function register(
+        address referrer,
+        bytes32 baseClaimTxHash,
+        uint256 deadline,
+        bytes calldata signature
+    ) external nonReentrant returns (uint256 pointsAwarded) {
+        if (block.timestamp > deadline) revert SignatureExpired(deadline);
+
         address account = msg.sender;
+        bytes32 digest = _hashTypedData(
+            keccak256(
+                abi.encode(
+                    REFERRAL_AUTHORIZATION_TYPEHASH,
+                    account,
+                    referrer,
+                    baseClaimTxHash,
+                    deadline
+                )
+            )
+        );
 
-        if (referrer == address(0)) revert ZeroAddress();
-        if (referrer == account) revert SelfReferral();
-        if (referralRegistered[account]) revert ReferralAlreadyRegistered(account);
-        if (!faucetVault.hasClaimed(account)) revert ClaimRequired(account);
+        if (ECDSA.recover(digest, signature) != claimSigner) revert InvalidSignature();
 
-        pointsAwarded = pointsPerReferral;
-        referralRegistered[account] = true;
-        referredBy[account] = referrer;
+        pointsAwarded = _register(account, referrer, baseClaimTxHash);
+    }
 
-        if (!_knownReferrer[referrer]) {
-            _knownReferrer[referrer] = true;
-            _referrers.push(referrer);
-        }
+    function domainSeparator() external view returns (bytes32) {
+        return _domainSeparator;
+    }
 
-        ReferralStats storage stats = _stats[referrer];
-        stats.points += pointsAwarded;
-        stats.referrals += 1;
-        stats.lastReferralAt = block.timestamp;
-        totalRegisteredReferrals += 1;
+    function recordReferral(address account, address referrer, bytes32 baseClaimTxHash)
+        external
+        onlyRegistrar
+        nonReentrant
+        returns (uint256 pointsAwarded)
+    {
+        pointsAwarded = _register(account, referrer, baseClaimTxHash);
+    }
 
-        emit ReferralRegistered(account, referrer, pointsAwarded, stats.points, stats.referrals);
+    function setClaimSigner(address newClaimSigner) external onlyOwner {
+        if (newClaimSigner == address(0)) revert ZeroAddress();
+
+        emit ClaimSignerUpdated(claimSigner, newClaimSigner);
+        claimSigner = newClaimSigner;
+    }
+
+    function setRegistrar(address registrar, bool allowed) external onlyOwner {
+        if (registrar == address(0)) revert ZeroAddress();
+
+        registrars[registrar] = allowed;
+        emit RegistrarUpdated(registrar, allowed);
     }
 
     function setPointsPerReferral(uint256 newPointsPerReferral) external onlyOwner {
@@ -154,5 +214,45 @@ contract PappardelleReferralRegistry is Ownable, ReentrancyGuard {
                 break;
             }
         }
+    }
+
+    function _register(address account, address referrer, bytes32 baseClaimTxHash)
+        private
+        returns (uint256 pointsAwarded)
+    {
+        if (account == address(0) || referrer == address(0)) revert ZeroAddress();
+        if (baseClaimTxHash == bytes32(0)) revert ZeroHash();
+        if (referrer == account) revert SelfReferral();
+        if (referralRegistered[account]) revert ReferralAlreadyRegistered(account);
+        if (baseClaimTxHashUsed[baseClaimTxHash]) revert ClaimHashAlreadyUsed(baseClaimTxHash);
+
+        pointsAwarded = pointsPerReferral;
+        referralRegistered[account] = true;
+        referredBy[account] = referrer;
+        baseClaimTxHashUsed[baseClaimTxHash] = true;
+
+        if (!_knownReferrer[referrer]) {
+            _knownReferrer[referrer] = true;
+            _referrers.push(referrer);
+        }
+
+        ReferralStats storage stats = _stats[referrer];
+        stats.points += pointsAwarded;
+        stats.referrals += 1;
+        stats.lastReferralAt = block.timestamp;
+        totalRegisteredReferrals += 1;
+
+        emit ReferralRegistered(
+            account,
+            referrer,
+            baseClaimTxHash,
+            pointsAwarded,
+            stats.points,
+            stats.referrals
+        );
+    }
+
+    function _hashTypedData(bytes32 structHash) private view returns (bytes32) {
+        return keccak256(abi.encodePacked("\x19\x01", _domainSeparator, structHash));
     }
 }
