@@ -1,4 +1,5 @@
 import { FaucetApp } from "@/components/FaucetApp";
+import { farcasterAppJsonLd } from "@/lib/farcaster";
 import {
   rektaurantUrl,
   siteDescription,
@@ -54,6 +55,8 @@ const jsonLd = {
         "One-time PAPPARDELLE token claim on Base",
         "Base network wallet connection",
         "Vault donation flow for faucet refills",
+        "Celo referral leaderboard",
+        "MiniPay and Farcaster Mini App compatibility",
         "Links to PAPPARDELLE on Zora and Rektaurant"
       ],
       about: [
@@ -72,6 +75,7 @@ const jsonLd = {
       ],
       sameAs: [tokenUrl, vaultUrl, zoraUrl, rektaurantUrl]
     },
+    farcasterAppJsonLd,
     {
       "@type": "BreadcrumbList",
       "@id": `${siteUrl}#breadcrumbs`,

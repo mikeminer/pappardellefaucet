@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { farcasterMiniAppEmbed } from "@/lib/farcaster";
 import {
   siteDescription,
   siteKeywords,
@@ -22,8 +23,11 @@ export const metadata: Metadata = {
   creator: "pappardelle.eth",
   publisher: "pappardelle.eth",
   other: {
-    "talentapp:project_verification": talentAppProjectVerification
+    "talentapp:project_verification": talentAppProjectVerification,
+    "fc:miniapp": JSON.stringify(farcasterMiniAppEmbed),
+    "fc:frame": JSON.stringify(farcasterMiniAppEmbed)
   },
+  manifest: "/manifest.webmanifest",
   alternates: {
     canonical: siteUrl
   },

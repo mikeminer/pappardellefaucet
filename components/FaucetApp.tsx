@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -47,12 +47,9 @@ import {
 } from "@/lib/chains";
 import { erc20Abi, faucetVaultAbi, referralRegistryAbi } from "@/lib/abi";
 import { compactAddress, formatCount, formatTokenAmount } from "@/lib/format";
+import { useMiniAppCompatibility, type MiniAppProvider } from "@/hooks/useMiniAppCompatibility";
 
-type EthereumProvider = {
-  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
-  on?: (event: string, handler: (...args: unknown[]) => void) => void;
-  removeListener?: (event: string, handler: (...args: unknown[]) => void) => void;
-};
+type EthereumProvider = MiniAppProvider;
 
 type Snapshot = {
   symbol: string;
@@ -89,12 +86,6 @@ type ReferralAuthorizationResponse = {
   deadline?: string | number;
   baseClaimTxHash?: `0x${string}`;
 };
-
-declare global {
-  interface Window {
-    ethereum?: EthereumProvider;
-  }
-}
 
 const configuredFaucetAddress =
   faucetAddress && isAddress(faucetAddress) ? (faucetAddress as Address) : undefined;
@@ -160,6 +151,13 @@ export function FaucetApp() {
   const [referralError, setReferralError] = useState<string>();
   const [copyStatus, setCopyStatus] = useState<string>();
   const [isRegisteringReferral, setIsRegisteringReferral] = useState(false);
+  const autoConnectedRef = useRef(false);
+  const miniAppCompatibility = useMiniAppCompatibility();
+
+  const getProvider = useCallback(
+    () => miniAppCompatibility.provider || window.ethereum,
+    [miniAppCompatibility.provider]
+  );
 
   const publicClient = useMemo(
     () =>
@@ -372,7 +370,7 @@ export function FaucetApp() {
   );
 
   const checkNetwork = useCallback(async () => {
-    const provider = window.ethereum;
+    const provider = getProvider();
     if (!provider) {
       setNetworkOk(false);
       return false;
@@ -382,10 +380,10 @@ export function FaucetApp() {
     const isBase = typeof chainId === "string" && chainId.toLowerCase() === appChainIdHex;
     setNetworkOk(isBase);
     return isBase;
-  }, []);
+  }, [getProvider]);
 
   const switchToBase = useCallback(async () => {
-    const provider = window.ethereum;
+    const provider = getProvider();
     if (!provider) throw new Error("Wallet not found.");
 
     try {
@@ -404,10 +402,10 @@ export function FaucetApp() {
     }
 
     setNetworkOk(true);
-  }, []);
+  }, [getProvider]);
 
   const switchToReferralChain = useCallback(async () => {
-    const provider = window.ethereum;
+    const provider = getProvider();
     if (!provider) throw new Error("Wallet not found.");
 
     try {
@@ -424,10 +422,10 @@ export function FaucetApp() {
         params: [referralChainParams]
       });
     }
-  }, []);
+  }, [getProvider]);
 
   const requestAccount = useCallback(async () => {
-    const provider = window.ethereum;
+    const provider = getProvider();
     if (!provider) throw new Error("Install a Base-compatible wallet.");
 
     const accounts = (await provider.request({ method: "eth_requestAccounts" })) as string[];
@@ -438,7 +436,7 @@ export function FaucetApp() {
     const typedAccount = nextAccount as Address;
     setAccount(typedAccount);
     return typedAccount;
-  }, []);
+  }, [getProvider]);
 
   const connectWallet = useCallback(async () => {
     setIsConnecting(true);
@@ -447,13 +445,22 @@ export function FaucetApp() {
 
     try {
       const nextAccount = await requestAccount();
+
+      if (miniAppCompatibility.isMiniPay) {
+        setNetworkOk(false);
+        setStatus("MiniPay detected on Celo. The Celo referral leaderboard is available; Base faucet claims need a Base-compatible wallet.");
+        await refresh(nextAccount);
+        await refreshReferralData(nextAccount);
+        return;
+      }
+
       const isBase = await checkNetwork();
 
       if (!isBase) {
         await switchToBase();
       }
 
-      setStatus("Wallet connected on Base.");
+      setStatus(miniAppCompatibility.isFarcasterMiniApp ? "Farcaster wallet connected on Base." : "Wallet connected on Base.");
       await refresh(nextAccount);
       await refreshReferralData(nextAccount);
     } catch (connectError) {
@@ -461,7 +468,15 @@ export function FaucetApp() {
     } finally {
       setIsConnecting(false);
     }
-  }, [checkNetwork, refresh, refreshReferralData, requestAccount, switchToBase]);
+  }, [
+    checkNetwork,
+    miniAppCompatibility.isFarcasterMiniApp,
+    miniAppCompatibility.isMiniPay,
+    refresh,
+    refreshReferralData,
+    requestAccount,
+    switchToBase
+  ]);
 
   const registerReferral = useCallback(
     async (
@@ -605,7 +620,7 @@ export function FaucetApp() {
       const activeAccount = account || (await requestAccount());
       await switchToBase();
 
-      const provider = window.ethereum;
+      const provider = getProvider();
       if (!provider) throw new Error("Wallet not found.");
 
       setIsDonating(true);
@@ -637,7 +652,17 @@ export function FaucetApp() {
     } finally {
       setIsDonating(false);
     }
-  }, [account, donationAmount, publicClient, refresh, requestAccount, snapshot.decimals, snapshot.walletBalance, switchToBase]);
+  }, [
+    account,
+    donationAmount,
+    getProvider,
+    publicClient,
+    refresh,
+    requestAccount,
+    snapshot.decimals,
+    snapshot.walletBalance,
+    switchToBase
+  ]);
 
   const claim = useCallback(async () => {
     setError(undefined);
@@ -652,7 +677,7 @@ export function FaucetApp() {
       const activeAccount = account || (await requestAccount());
       await switchToBase();
 
-      const provider = window.ethereum;
+      const provider = getProvider();
       if (!provider) throw new Error("Wallet not found.");
 
       setIsClaiming(true);
@@ -694,6 +719,7 @@ export function FaucetApp() {
     }
   }, [
     account,
+    getProvider,
     pendingReferrer,
     publicClient,
     refresh,
@@ -718,7 +744,7 @@ export function FaucetApp() {
   useEffect(() => {
     checkNetwork().catch(() => undefined);
 
-    const provider = window.ethereum;
+    const provider = getProvider();
     if (!provider?.on || !provider.removeListener) return;
 
     const handleAccountsChanged = (accounts: unknown) => {
@@ -745,7 +771,14 @@ export function FaucetApp() {
       provider.removeListener?.("accountsChanged", handleAccountsChanged);
       provider.removeListener?.("chainChanged", handleChainChanged);
     };
-  }, [checkNetwork, refresh, refreshReferralData]);
+  }, [checkNetwork, getProvider, refresh, refreshReferralData]);
+
+  useEffect(() => {
+    if (!miniAppCompatibility.shouldAutoConnect || account || autoConnectedRef.current) return;
+
+    autoConnectedRef.current = true;
+    connectWallet().catch(() => undefined);
+  }, [account, connectWallet, miniAppCompatibility.shouldAutoConnect]);
 
   useEffect(() => {
     if (!showInvitation) return;
@@ -789,13 +822,22 @@ export function FaucetApp() {
     isClaiming ||
     isRegisteringReferral ||
     isRefreshing ||
+    miniAppCompatibility.isMiniPay ||
     !configuredFaucetAddress ||
     Boolean(snapshot.paused) ||
     Boolean(snapshot.hasClaimed) ||
     (account ? snapshot.canClaim === false : false);
-  const donateDisabled = isConnecting || isDonating || isRefreshing || !configuredFaucetAddress || !donationAmount.trim();
+  const donateDisabled =
+    isConnecting ||
+    isDonating ||
+    isRefreshing ||
+    miniAppCompatibility.isMiniPay ||
+    !configuredFaucetAddress ||
+    !donationAmount.trim();
 
-  const claimLabel = !account
+  const claimLabel = miniAppCompatibility.isMiniPay
+    ? "Base wallet required"
+    : !account
     ? "Connect wallet"
     : snapshot.hasClaimed
       ? "Already served"
@@ -822,14 +864,14 @@ export function FaucetApp() {
   const retryReferralRegistration = useCallback(async () => {
     if (!account || !pendingReferrer || !lastClaimTxHash) return;
 
-    const provider = window.ethereum;
+    const provider = getProvider();
     if (!provider) {
       setReferralError("Wallet not found.");
       return;
     }
 
     await registerReferral(account, pendingReferrer, lastClaimTxHash, provider);
-  }, [account, lastClaimTxHash, pendingReferrer, registerReferral]);
+  }, [account, getProvider, lastClaimTxHash, pendingReferrer, registerReferral]);
 
   return (
     <div className="app-frame">
@@ -879,10 +921,12 @@ export function FaucetApp() {
               <p className="label">Wallet</p>
               <p className="value">{account ? compactAddress(account) : "Not connected"}</p>
             </div>
-            <button className="secondary-button" type="button" onClick={connectWallet} disabled={isConnecting}>
-              {isConnecting ? <Loader2 className="spin" size={18} /> : <Wallet size={18} />}
-              <span>{account ? "Reconnect" : "Connect"}</span>
-            </button>
+            {!miniAppCompatibility.isMiniPay ? (
+              <button className="secondary-button" type="button" onClick={connectWallet} disabled={isConnecting}>
+                {isConnecting ? <Loader2 className="spin" size={18} /> : <Wallet size={18} />}
+                <span>{account ? "Reconnect" : "Connect"}</span>
+              </button>
+            ) : null}
           </div>
 
           <button className="claim-button" type="button" onClick={claim} disabled={claimDisabled}>
@@ -894,6 +938,20 @@ export function FaucetApp() {
             <div className="notice warning">
               <AlertTriangle size={18} />
               <span>Configure NEXT_PUBLIC_FAUCET_ADDRESS after deploying the vault.</span>
+            </div>
+          ) : null}
+
+          {miniAppCompatibility.isMiniPay ? (
+            <div className="notice warning">
+              <Info size={18} />
+              <span>MiniPay detected. The Celo referral leaderboard works here, while the Base token claim still needs a Base-compatible wallet.</span>
+            </div>
+          ) : null}
+
+          {miniAppCompatibility.isFarcasterMiniApp ? (
+            <div className="notice success">
+              <CheckCircle2 size={18} />
+              <span>Farcaster Mini App ready. The app is using the Farcaster wallet provider when available.</span>
             </div>
           ) : null}
 

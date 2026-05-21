@@ -27,6 +27,8 @@ Referral registry Celo deployato:
 - Il limite e salvato on-chain in `hasClaimed(address)`.
 - Il contratto opzionale `PappardelleReferralRegistry` viene deployato su Celo mainnet e assegna punti on-chain per un futuro airdrop.
 - La UI legge `?ref=0x...`, mostra la leaderboard Celo e puo chiedere al registrar di sincronizzare i punti dopo il claim.
+- La UI include un hook di compatibilita per MiniPay e Farcaster Mini Apps: rileva MiniPay, chiama `sdk.actions.ready()` in Farcaster e usa il provider Farcaster quando disponibile.
+- Il progetto espone `/.well-known/farcaster.json`, `/manifest.json`, meta `fc:miniapp` / `fc:frame` e un webhook Farcaster minimale.
 - Vercel ospita solo la UI, quindi non serve mettere una private key nel frontend.
 - Il proprietario puo mettere in pausa il faucet, cambiare `claimAmount` e ritirare token dal vault.
 
@@ -102,7 +104,16 @@ NEXT_PUBLIC_FAUCET_ADDRESS=0xCE749CDe53b8E6791F300555d9ee8b1Df9B21f65
 NEXT_PUBLIC_REFERRAL_REGISTRY_ADDRESS=0xAD85C867587F642Ba2303731F32fEA252838A025
 NEXT_PUBLIC_REFERRAL_RPC_URL=https://forno.celo.org
 NEXT_PUBLIC_REFERRAL_AUTH_API_URL=https://...
+FARCASTER_ACCOUNT_ASSOCIATION_HEADER=...
+FARCASTER_ACCOUNT_ASSOCIATION_PAYLOAD=...
+FARCASTER_ACCOUNT_ASSOCIATION_SIGNATURE=...
 ```
+
+## MiniPay e Farcaster
+
+MiniPay gira su Celo: la leaderboard referral su Celo funziona nel client MiniPay, mentre il claim del token PAPPARDELLE resta su Base e richiede un wallet compatibile con Base. Il hook `useMiniAppCompatibility` rileva MiniPay con `window.ethereum.isMiniPay`, auto-collega il wallet e mostra lo stato corretto nella UI.
+
+Per pubblicare come Farcaster Mini App, compila le tre variabili `FARCASTER_ACCOUNT_ASSOCIATION_*` con la firma del tuo account Farcaster. Senza quelle variabili il manifest e i meta tag sono presenti, ma la ownership del dominio non e ancora associata al tuo FID.
 
 ## Nota anti-abuso
 
